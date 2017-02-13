@@ -18,14 +18,7 @@ module Neo4j
           @with_associations_spec ||= []
         end
 
-        def with_associations(*spec)
-          invalid_association_names = spec.reject do |association_name|
-            model.associations[association_name]
-          end
-
-          if !invalid_association_names.empty?
-            fail "Invalid associations: #{invalid_association_names.join(', ')}"
-          end
+        def with_associations(assoc_conf)
 
 
 
@@ -62,47 +55,46 @@ module Neo4j
           path_constructor.call([], assoc_conf)
 
           # Construct cypher queries
-          match_statements = []
+          proxy_set = []
 
-          path_directive_class_table[object_name.to_sym] = self
+          path_directive_class_table[object_name.to_sym] = self.model
 
           paths.each do |path|
-            assoc_class = self
-
-            query_string = '('+object_name+':'+self.name+')'
+            proxy = self.model.query_proxy.as(object_name.to_sym)
 
             path.each do |path_directive|
-              relationship_type = assoc_class.associations[path_directive].relationship_type
-              assoc_class = assoc_class.associations[path_directive].target_class
-              path_directive_class_table[path_directive] = assoc_class
-              query_string += '-[:' + relationship_type.to_s + ']->(' + path_directive.to_s + ':' + assoc_class.name + ')'
+              proxy = proxy.send(path_directive, path_directive)
+              path_directive_class_table[path_directive] = proxy.model
             end
 
-            match_statements << query_string
+            proxy_set << proxy
           end
 
 
-          assoc_chain = [object_name] + paths.first
+          assoc_chain = [object_name.to_sym] + paths.first
 
           # Perform queries to gather information from database for eager loading
-          matches = Neo4j::Session.current.query.match(match_statements.join(','))
-                        .pluck(assoc_chain)
+          matches = proxy_set.first.pluck(*assoc_chain)
 
           # Embed the nodes correctly within the object in order to reconstruct the model
           link_nodes = lambda do |match, parent, path|
-            unless path.empty?
-              path_member = path.shift
-              parent[path_member] = link_nodes.call(match, match[assoc_chain.find_index(path_member)].attributes, path)
+            return parent if path.empty?
+
+            path_member = path.shift
+            path_obj = match[assoc_chain.find_index(path_member)]
+
+            if parent.nil?
+              link_nodes.call(match, path_obj, path)
+            else
+              value = link_nodes.call(match, path_obj, path)
+              parent.write_attribute(path_member,[value])
+              parent
             end
-
-
-
-            parent
           end
 
 
           matches.map do |match|
-            link_nodes.call(match, {}, assoc_chain.dup)[assoc_chain.first]
+            link_nodes.call(match, nil, assoc_chain.dup)
           end
         end
 
