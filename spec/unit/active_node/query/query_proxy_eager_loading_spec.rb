@@ -1,6 +1,5 @@
 describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
   let(:person_model) { double('Fake Person model')}
-  let(:session) { double('A session') }
 
 
   before do
@@ -18,8 +17,17 @@ describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
   describe 'with_associations spec' do
 
     context '1 model family composition' do
+
       before(:each) do
         Person.delete_all
+        #Create associations
+        parent.sisters << aunt
+        aunt.children << nephew
+        aunt.children << niece
+        aunt.sons << nephew
+        aunt.daughters << niece
+        aunt.favourite = parent
+
       end
 
       #Create Person Objects
@@ -29,20 +37,25 @@ describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
       let!(:niece) { Person.create(name: 'Janice') }
 
       it 'fetches full structure with model association depth > 2' do
-        #Create associations
-        parent.sisters << aunt
-        aunt.children << nephew
-        aunt.children << niece
-        aunt.sons << nephew
-        aunt.daughters << niece
-        aunt.favourite = parent
+        expect(Neo4j::ActiveBase).to_not receive(:run_transaction)
 
-        result = Person.where(name: parent.name).sisters.with_associations(:sisters=>[:children]).first
+        result = Person.where(name: parent.name).with_associations(:sisters=>[:children]).first
 
         expect(result).to be_a(Person)
-        expect(result.sisters).to be_a(Array) #should be AssociationProxy
 
+        expect(result.sisters).to be_a(Neo4j::ActiveNode::HasN::AssociationProxy)
+        result_aunt = result.sisters.first
+
+        expect(result_aunt).to be_a(Person)
+        expect(result_aunt[:name]).to eql(aunt[:name])
+
+        expect(result_aunt.children).to be_a(Neo4j::ActiveNode::HasN::AssociationProxy)
+        result_child = result_aunt.children.first
+
+        expect(result_child).to be_a(Person)
+        expect(result_child[:name]).to eql(niece.name)
       end
+
     end
 
 

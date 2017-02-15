@@ -87,7 +87,7 @@ module Neo4j
               link_nodes.call(match, path_obj, path)
             else
               value = link_nodes.call(match, path_obj, path)
-              parent.write_attribute(path_member,[value])
+              parent.write_attribute(path_member,[value], {write_to_cache: true})
               parent
             end
           end
