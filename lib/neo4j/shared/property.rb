@@ -197,7 +197,7 @@ module Neo4j::Shared
         remove_instance_variable('@attribute_methods_generated') if instance_variable_defined?('@attribute_methods_generated')
         define_attribute_methods([name]) unless attribute_names.include?(name)
         attributes[name.to_s] = declared_properties[name]
-        define_method("#{name}=") do |value, options={}|
+        define_method("#{name}=") do |value, _options = {}|
           typecast_value = typecast_attribute(_attribute_typecaster(name), value)
           send("#{name}_will_change!") unless typecast_value == read_attribute(name)
           super(value)

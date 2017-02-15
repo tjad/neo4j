@@ -19,44 +19,31 @@ module Neo4j
         end
 
         def with_associations(assoc_conf)
-
-
-
-          object_name = self.name.gsub(/::/, '/').
-              gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
-              gsub(/([a-z\d])([A-Z])/,'\1_\2').
-              tr("-", "_").
-              downcase
+          object_name = name_snake_case
 
           # Construct paths to represent the query paths for information to be eagerly loaded
           paths = []
+          construct_path_config(paths, [], assoc_conf)
+
           # For reconstructing objects
           path_directive_class_table = {}
 
-
-          path_constructor = lambda do |current_path, path_conf|
-
-            if path_conf.instance_of? Hash
-              path_conf.each do |k, v|
-                path_constructor.call(current_path+[k], v)
-              end
-            elsif path_conf.instance_of? Array
-              path_conf.each do |path|
-                paths << current_path + [path]
-              end
-            elsif path_conf.instance_of? Symbol # Append to current path and add to paths local variable
-              current_path << path_conf
-              paths << current_path
-            else
-              raise Exception.new("Unhandled path type")
-            end
-          end
-
-          path_constructor.call([], assoc_conf)
-
           # Construct cypher queries
-          proxy_set = []
+          proxy_set = construct_cypher_queries(object_name, path_directive_class_table, paths)
 
+          assoc_chain = [object_name.to_sym] + paths.first
+
+          # Perform queries to gather information from database for eager loading
+          matches = proxy_set.first.pluck(*assoc_chain)
+
+          # Embed the nodes correctly within the object in order to reconstruct the model
+          matches.map do |match|
+            compose_model(match, nil, assoc_chain.dup, assoc_chain)
+          end
+        end
+
+        def construct_cypher_queries(object_name, path_directive_class_table, paths)
+          proxy_set = []
           path_directive_class_table[object_name.to_sym] = self.model
 
           paths.each do |path|
@@ -69,36 +56,50 @@ module Neo4j
 
             proxy_set << proxy
           end
-
-
-          assoc_chain = [object_name.to_sym] + paths.first
-
-          # Perform queries to gather information from database for eager loading
-          matches = proxy_set.first.pluck(*assoc_chain)
-
-          # Embed the nodes correctly within the object in order to reconstruct the model
-          link_nodes = lambda do |match, parent, path|
-            return parent if path.empty?
-
-            path_member = path.shift
-            path_obj = match[assoc_chain.find_index(path_member)]
-
-            if parent.nil?
-              link_nodes.call(match, path_obj, path)
-            else
-              value = link_nodes.call(match, path_obj, path)
-              parent.write_attribute(path_member,[value], {write_to_cache: true})
-              parent
-            end
-          end
-
-
-          matches.map do |match|
-            link_nodes.call(match, nil, assoc_chain.dup)
-          end
+          proxy_set
         end
 
         private
+
+        def compose_model(match, parent, path, assoc_chain)
+          return parent if path.empty?
+
+          path_member = path.shift
+          path_obj = match[assoc_chain.find_index(path_member)]
+
+          if parent.nil?
+            compose_model(match, path_obj, path, assoc_chain)
+          else
+            value = compose_model(match, path_obj, path, assoc_chain)
+            parent.write_attribute(path_member, [value], write_to_cache: true)
+            parent
+          end
+        end
+
+        def name_snake_case
+          self.name.gsub(/::/, '/')
+              .gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+              .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+              .tr('-', '_')
+              .downcase
+        end
+
+        def construct_path_config(paths, current_path, path_conf)
+          if path_conf.instance_of? Hash
+            path_conf.each do |k, v|
+              construct_path_config(paths, current_path + [k], v)
+            end
+          elsif path_conf.instance_of? Array
+            path_conf.each do |path|
+              paths << current_path + [path]
+            end
+          elsif path_conf.instance_of? Symbol # Append to current path and add to paths local variable
+            current_path << path_conf
+            paths << current_path
+          else
+            fail Exception, 'Unhandled path type'
+          end
+        end
 
         def with_associations_return_clause(variables = with_associations_spec)
           variables.map { |n| "#{n}_collection" }.join(',')

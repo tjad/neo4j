@@ -392,7 +392,7 @@ module Neo4j::ActiveNode
       end
 
       def define_has_many_setter(name)
-        define_method("#{name}=") do |other_nodes, options={}|
+        define_method("#{name}=") do |other_nodes, options = {}|
           association_proxy_cache.clear
 
           clear_deferred_nodes_for_association(name)
@@ -476,7 +476,7 @@ module Neo4j::ActiveNode
       end
 
       def define_has_one_setter(name)
-        define_method("#{name}=") do |other_node, options|
+        define_method("#{name}=") do |other_node, options = {}|
           if persisted?
             other_node.save if other_node.respond_to?(:persisted?) && !other_node.persisted?
             association_proxy_cache.clear # TODO: Should probably just clear for this association...

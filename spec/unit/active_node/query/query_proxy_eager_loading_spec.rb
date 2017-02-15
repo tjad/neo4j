@@ -1,5 +1,5 @@
 describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
-  let(:person_model) { double('Fake Person model')}
+  let(:person_model) { double('Fake Person model') }
 
 
   before do
@@ -15,31 +15,28 @@ describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
   end
 
   describe 'with_associations spec' do
-
     context '1 model family composition' do
-
       before(:each) do
         Person.delete_all
-        #Create associations
+        # Create associations
         parent.sisters << aunt
         aunt.children << nephew
         aunt.children << niece
         aunt.sons << nephew
         aunt.daughters << niece
         aunt.favourite = parent
-
       end
 
-      #Create Person Objects
+      # Create Person Objects
       let!(:parent) { Person.create(name: 'Jack') }
-      let!(:aunt) { Person.create(name: 'Jill')}
+      let!(:aunt) { Person.create(name: 'Jill') }
       let!(:nephew) { Person.create(name: 'Johnny') }
       let!(:niece) { Person.create(name: 'Janice') }
 
       it 'fetches full structure with model association depth > 2' do
         expect(Neo4j::ActiveBase).to_not receive(:run_transaction)
 
-        result = Person.where(name: parent.name).with_associations(:sisters=>[:children]).first
+        result = Person.where(name: parent.name).with_associations(sisters: [:children]).first
 
         expect(result).to be_a(Person)
 
@@ -55,11 +52,6 @@ describe Neo4j::ActiveNode::Query::QueryProxyEagerLoading do
         expect(result_child).to be_a(Person)
         expect(result_child[:name]).to eql(niece.name)
       end
-
     end
-
-
-
   end
-
 end

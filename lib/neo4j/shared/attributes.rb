@@ -60,7 +60,7 @@ module Neo4j::Shared
     # @param [Object] value The value to set for the attribute.
     #
     # @raise [UnknownAttributeError] if the attribute is unknown
-    def write_attribute(name, value, options={})
+    def write_attribute(name, value, options = {})
       fail Neo4j::UnknownAttributeError, "unknown attribute: #{name}" if !respond_to? "#{name}="
 
       if options.empty?

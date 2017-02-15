@@ -214,7 +214,7 @@ module Neo4j::Shared
         it 'uses attr_name= without options hash when options hash is empty or not passed in' do
           allow(model).to receive(:first_name=)
           model.send(method, :first_name, 'Ben')
-          model.send(method, :first_name, 'Ben',{})
+          model.send(method, :first_name, 'Ben', {})
           expect(model).to have_received(:first_name=).with('Ben').exactly(2).times
         end
 
@@ -228,7 +228,7 @@ module Neo4j::Shared
         it 'defaults to using empty options hash when no options supplied' do
           allow(model).to receive(method)
           model.send(method, :first_name, 'Ben')
-          expect(model).to have_received(method).with( :first_name, 'Ben')
+          expect(model).to have_received(method).with(:first_name, 'Ben')
         end
 
         it 'is able to set an attribute to nil' do
