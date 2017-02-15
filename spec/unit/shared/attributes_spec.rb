@@ -211,6 +211,26 @@ module Neo4j::Shared
           expect { model.send(method, 'first_name', 'Ben') }.to change { model.attributes['first_name'] }.from(nil).to('Ben')
         end
 
+        it 'uses attr_name= without options hash when options hash is empty or not passed in' do
+          allow(model).to receive(:first_name=)
+          model.send(method, :first_name, 'Ben')
+          model.send(method, :first_name, 'Ben',{})
+          expect(model).to have_received(:first_name=).with('Ben').exactly(2).times
+        end
+
+        it 'uses attr_name= with options hash when options hash is populated' do
+          options = {my_option: 'my val'}
+          allow(model).to receive(:first_name=)
+          model.send(method, :first_name, 'Ben', options)
+          expect(model).to have_received(:first_name=).with('Ben', options)
+        end
+
+        it 'defaults to using empty options hash when no options supplied' do
+          allow(model).to receive(method)
+          model.send(method, :first_name, 'Ben')
+          expect(model).to have_received(method).with( :first_name, 'Ben')
+        end
+
         it 'is able to set an attribute to nil' do
           model.first_name = 'Ben'
           expect { model.send(method, :first_name, nil) }.to change { model.attributes['first_name'] }.from('Ben').to(nil)
