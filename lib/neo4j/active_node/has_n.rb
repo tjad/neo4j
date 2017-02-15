@@ -392,12 +392,19 @@ module Neo4j::ActiveNode
       end
 
       def define_has_many_setter(name)
-        define_method("#{name}=") do |other_nodes|
+        define_method("#{name}=") do |other_nodes, options={}|
           association_proxy_cache.clear
 
           clear_deferred_nodes_for_association(name)
 
-          self.class.run_transaction { association_proxy(name).replace_with(other_nodes) }
+          association_proxy = association_proxy(name)
+
+
+          if options[:write_to_cache]
+            association_proxy.cache_result(other_nodes)
+          else
+            self.class.run_transaction { association_proxy.replace_with(other_nodes) }
+          end
         end
       end
 
@@ -469,11 +476,17 @@ module Neo4j::ActiveNode
       end
 
       def define_has_one_setter(name)
-        define_method("#{name}=") do |other_node|
+        define_method("#{name}=") do |other_node, options|
           if persisted?
             other_node.save if other_node.respond_to?(:persisted?) && !other_node.persisted?
             association_proxy_cache.clear # TODO: Should probably just clear for this association...
-            self.class.run_transaction { association_proxy(name).replace_with(other_node) }
+            association_proxy = association_proxy(name)
+
+            if options[:write_to_cache]
+              association_proxy.cache_result(other_node)
+            else
+              self.class.run_transaction { association_proxy.replace_with(other_node) }
+            end
             # handle_non_persisted_node(other_node)
           else
             defer_create(name, other_node, clear: true)
